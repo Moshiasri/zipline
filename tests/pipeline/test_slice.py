@@ -1,11 +1,7 @@
 """
 Tests for slicing pipeline terms.
 """
-from pandas import (
-    date_range,
-    Int64Index,
-    Timestamp,
-)
+from pandas import Int64Index, Timestamp
 from pandas.util.testing import assert_frame_equal
 
 from zipline.assets import Asset
@@ -47,12 +43,13 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
     def init_class_fixtures(cls):
         super(SliceTestCase, cls).init_class_fixtures()
 
-        day = cls.trading_schedule.day
-        cls.dates = dates = date_range(
-            '2015-02-01', '2015-02-28', freq=day, tz='UTC',
-        )
-        cls.start_date = dates[14]
-        cls.end_date = dates[18]
+        # Using the date at index 14 as the start date because when running
+        # pipelines, especially those involving correlations or regressions, we
+        # want to make sure there are enough days to look back on. The end date
+        # at index 18 is chosen for convenience, as it makes for a contiguous
+        # five day span.
+        cls.pipeline_start_date = cls.trading_days[14]
+        cls.pipeline_end_date = cls.trading_days[18]
 
         # Random input for factors.
         cls.col = TestingDataSet.float_col
@@ -85,8 +82,8 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
         # function of our custom factor above.
         self.run_pipeline(
             Pipeline(columns={'uses_sliced_input': UsesSlicedInput()}),
-            self.start_date,
-            self.end_date,
+            self.pipeline_start_date,
+            self.pipeline_end_date,
         )
 
     @parameter_space(unmasked_column=[0, 1, 2], slice_column=[0, 1, 2])
@@ -97,8 +94,8 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
         """
         sids = self.sids
         asset_finder = self.asset_finder
-        start_date = self.start_date
-        end_date = self.end_date
+        start_date = self.pipeline_start_date
+        end_date = self.pipeline_end_date
 
         # Create a filter that masks out all but a single asset.
         unmasked_asset = asset_finder.retrieve_asset(sids[unmasked_column])
@@ -180,8 +177,8 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
         with self.assertRaises(NonExistentAssetInTimeFrame):
             self.run_pipeline(
                 Pipeline(columns={'uses_sliced_input': UsesSlicedInput()}),
-                self.start_date,
-                self.end_date,
+                self.pipeline_start_date,
+                self.pipeline_end_date,
             )
 
     def test_window_safety_of_slices(self):
@@ -206,8 +203,8 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
         with self.assertRaises(NonWindowSafeInput):
             self.run_pipeline(
                 Pipeline(columns={'uses_sliced_input': UsesSlicedInput()}),
-                self.start_date,
-                self.end_date,
+                self.pipeline_start_date,
+                self.pipeline_end_date,
             )
 
         # Make sure that slices of custom factors are not window safe.
@@ -231,8 +228,8 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
         with self.assertRaises(NonWindowSafeInput):
             self.run_pipeline(
                 Pipeline(columns={'uses_sliced_input': UsesSlicedInput()}),
-                self.start_date,
-                self.end_date,
+                self.pipeline_start_date,
+                self.pipeline_end_date,
             )
 
         # Create a window safe factor.
@@ -306,7 +303,9 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
         }
 
         results = self.run_pipeline(
-            Pipeline(columns=columns), self.start_date, self.end_date,
+            Pipeline(columns=columns),
+            self.pipeline_start_date,
+            self.pipeline_end_date,
         )
         pearson_results = results['pearson'].unstack()
         spearman_results = results['spearman'].unstack()
@@ -382,7 +381,9 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
         }
 
         results = self.run_pipeline(
-            Pipeline(columns=columns), self.start_date, self.end_date,
+            Pipeline(columns=columns),
+            self.pipeline_start_date,
+            self.pipeline_end_date,
         )
         regression_results = results['regression'].unstack()
         expected_regression_results = results['expected_regression'].unstack()
