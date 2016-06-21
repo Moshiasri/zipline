@@ -23,6 +23,7 @@ from zipline.pipeline.factors import (
 )
 from zipline.testing import (
     AssetID,
+    AssetIDPlusDay,
     check_arrays,
     OpenPrice,
     parameter_space,
@@ -212,8 +213,8 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
             window_length = 1
             inputs = [col]
 
-            def compute(self, today, assets, out, close):
-                out[:] = close
+            def compute(self, today, assets, out, col):
+                pass
 
         my_unsafe_factor = MyUnsafeFactor()
         my_unsafe_factor_slice = my_unsafe_factor[my_asset]
@@ -238,7 +239,7 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
             inputs = [col]
             window_safe = True
 
-            def compute(self, today, assets, out, close):
+            def compute(self, today, assets, out, col):
                 pass
 
         my_safe_factor = MySafeFactor()
@@ -255,6 +256,50 @@ class SliceTestCase(WithSeededRandomPipelineEngine, ZiplineTestCase):
             my_safe_factor.pearsonr(
                 target=my_unsafe_factor_slice, correlation_length=10,
             )
+
+    def test_single_column_output(self):
+        """
+        Tests for custom factors that compute a 1D out.
+        """
+        alternating_mask = (AssetIDPlusDay() % 2).eq(0)
+
+        class SingleColumnOutput(CustomFactor):
+            window_length = 1
+            inputs = [self.col]
+            window_safe = True
+            ndim = 1
+
+            def compute(self, today, assets, out, col):
+                # Because we specified ndim as 1, `out` should be a singleton
+                # array but `close` should be a regular sized input.
+                assert out.shape == (1,)
+                assert col.shape == (1, 3)
+                out[:] = col.sum()
+
+        class UsesSingleColumnInput(CustomFactor):
+            window_length = 1
+            inputs = [SingleColumnOutput()]
+
+            def compute(self, today, assets, out, single_column):
+                # Make sure that `single_column` has the correct shape. That
+                # is, it should always have one column regardless of any mask
+                # passed to `UsesSingleColumnInput`.
+                assert single_column.shape == (1, 1)
+
+        columns = {
+            'uses_single_column_input': UsesSingleColumnInput(),
+            'uses_single_column_input_masked': UsesSingleColumnInput(
+                mask=alternating_mask,
+            ),
+        }
+
+        # Assertions about the expected shapes of our data are made in the
+        # `compute` function of our custom factors above.
+        self.run_pipeline(
+            Pipeline(columns=columns),
+            self.pipeline_start_date,
+            self.pipeline_end_date,
+        )
 
     @parameter_space(returns_length=[2, 3], correlation_length=[3, 4])
     def test_factor_correlation_methods(self,

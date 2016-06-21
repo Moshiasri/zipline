@@ -168,22 +168,28 @@ class CustomTermMixin(object):
         Call the user's `compute` function on each window with a pre-built
         output array.
         """
+        format_inputs = self._format_inputs
         compute = self.compute
         params = self.params
+        ndim = self.ndim
 
-        shape = (len(mask), 1) if self.ndim == 1 else mask.shape
+        shape = (len(mask), 1) if ndim == 1 else mask.shape
         out = self._allocate_output(windows, shape)
 
         with self.ctx:
             for idx, date in enumerate(dates):
                 # Never apply a mask to 1D outputs.
-                col_mask = array([True]) if self.ndim == 1 else mask[idx]
-                masked_assets = assets[col_mask]
-                out_row = out[idx][col_mask]
-                inputs = self._format_inputs(windows, col_mask)
+                out_mask = array([True]) if ndim == 1 else mask[idx]
+
+                # Mask our inputs as usual.
+                inputs_mask = mask[idx]
+
+                masked_assets = assets[inputs_mask]
+                out_row = out[idx][out_mask]
+                inputs = format_inputs(windows, inputs_mask)
 
                 compute(date, masked_assets, out_row, *inputs, **params)
-                out[idx][col_mask] = out_row
+                out[idx][out_mask] = out_row
         return out
 
     def short_repr(self):
