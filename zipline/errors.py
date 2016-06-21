@@ -673,8 +673,9 @@ class UnsupportedPipelineOutput(ZiplineError):
     Raised when a 1D term is added as a column to a pipeline.
     """
     msg = (
-        "Adding slices or single-column-output terms as pipeline columns is "
-        "not currently supported."
+        "Cannot add column {column_name!r} with term {term}. Adding slices or "
+        "single-column-output terms as pipeline columns is not currently "
+        "supported."
     )
 
 

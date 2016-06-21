@@ -36,12 +36,13 @@ class Pipeline(object):
         screen=optional(Filter),
     )
     def __init__(self, columns=None, screen=None):
-
         if columns is None:
             columns = {}
-        for term in columns.values():
-            if term.ndim == 1:
-                raise UnsupportedPipelineOutput()
+
+        validate_column = self.validate_column
+        for name, term in columns.items():
+            validate_column(name, term)
+
         self._columns = columns
         self._screen = screen
 
@@ -77,8 +78,7 @@ class Pipeline(object):
             Whether to overwrite the existing entry if we already have a column
             named `name`.
         """
-        if term.ndim == 1:
-            raise UnsupportedPipelineOutput()
+        self.validate_column(name, term)
 
         columns = self.columns
         if name in columns:
@@ -172,3 +172,8 @@ class Pipeline(object):
             return g.jpeg
         else:
             raise ValueError("Unknown graph format %r." % format)
+
+    @staticmethod
+    def validate_column(column_name, term):
+        if term.ndim == 1:
+            raise UnsupportedPipelineOutput(column_name=column_name, term=term)
